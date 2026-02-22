@@ -64,8 +64,81 @@ class ChatInterface:
         print("   - 'List all Jedi characters'")
         print("   - 'How many planets are in the database?'")
         print("   - 'Who are the droids in the films?'")
-        print("\n📝 Type 'help' for more commands, 'quit' to exit")
+        print("\n📝 Try 'what can you do' for capabilities, 'help' for commands, 'quit' to exit")
         print("=" * 60 + "\n")
+    
+    def _is_meta_question(self, user_input: str) -> Optional[str]:
+        """
+        Detect meta-questions about system capabilities
+        Returns the command to execute, or None if it's a regular query
+        """
+        user_lower = user_input.lower().strip()
+        
+        # Remove punctuation for matching
+        user_clean = user_lower.rstrip('?!.')
+        
+        # Meta-question patterns
+        meta_patterns = {
+            'what can you do': 'capabilities',
+            'what can i do': 'capabilities',
+            'what are your capabilities': 'capabilities',
+            'capabilities': 'capabilities',
+            'what are you': 'capabilities',
+            'tell me about yourself': 'capabilities',
+            'who are you': 'capabilities',
+            'what is this': 'capabilities',
+            'how does this work': 'capabilities',
+            'about': 'capabilities',
+            'what can this do': 'capabilities',
+        }
+        
+        # Check for exact or near matches
+        for pattern, command in meta_patterns.items():
+            if user_clean == pattern or user_clean.startswith(pattern):
+                return command
+        
+        return None
+    
+    def _print_capabilities(self):
+        """Print system capabilities"""
+        stats = self.db.get_graph_stats()
+        print("\n" + "=" * 60)
+        print("🤖 SYSTEM CAPABILITIES")
+        print("=" * 60)
+        
+        print("\n✨ I can help you explore the Star Wars universe!")
+        print("\n📚 What I know about:")
+        for entity_type, count in sorted(stats['entity_types'].items(), key=lambda x: x[1], reverse=True):
+            print(f"   ✓ {entity_type}: {count} entries")
+        
+        print(f"\n📊 Available Data:")
+        print(f"   ✓ Total Facts: {stats['total_triples']:,}")
+        print(f"   ✓ Relationships: {stats['total_relations']}")
+        
+        print("\n💬 Types of questions I can answer:")
+        print("   ✓ Character information: 'Who is Luke Skywalker?'")
+        print("   ✓ Relationships: 'Who is Han Solo married to?'")
+        print("   ✓ Properties: 'How tall is Chewbacca?'")
+        print("   ✓ Filtering: 'List all Jedi'")
+        print("   ✓ Aggregates: 'How many planets are there?'")
+        print("   ✓ Comparisons: 'Which character is the tallest?'")
+        print("   ✓ Complex queries: 'Show me characters from Tatooine and their ships'")
+        
+        print("\n⚙️  Special commands:")
+        print("   • help - Show detailed help")
+        print("   • stats - Show graph statistics")
+        print("   • schema - Show available data types")
+        print("   • history - Show conversation history")
+        print("   • clear - Clear conversation history")
+        print("   • query <sparql> - Run raw SPARQL queries")
+        
+        print("\n💡 Tips:")
+        print("   • I use natural language processing to convert your questions to queries")
+        print("   • Ask in plain English - no special syntax needed")
+        print("   • I can handle follow-ups based on previous questions")
+        print("   • Type 'quit' or 'exit' to end the conversation")
+        
+        print("\n" + "=" * 60 + "\n")
     
     def _print_help(self):
         """Print help message"""
@@ -148,6 +221,12 @@ class ChatInterface:
                 user_input = input("\n🎯 You: ").strip()
                 
                 if not user_input:
+                    continue
+                
+                # Check for meta-questions first
+                meta_command = self._is_meta_question(user_input)
+                if meta_command == 'capabilities':
+                    self._print_capabilities()
                     continue
                 
                 # Handle special commands
