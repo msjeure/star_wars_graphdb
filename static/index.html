@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Wars GraphDB - Natural Language Query Engine</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🌟 Star Wars GraphDB</h1>
+                <p>Natural Language Query Engine</p>
+            </div>
+            <div class="header-buttons">
+                <button onclick="showTab('chat')" class="btn btn-header active">💬 Chat</button>
+                <button onclick="showTab('explore')" class="btn btn-header">🔍 Explore</button>
+                <button onclick="showTab('info')" class="btn btn-header">ℹ️ Info</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat Tab -->
+            <div id="chat-tab" class="tab active">
+                <div class="chat-container">
+                    <!-- Chat Messages -->
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="message system">
+                            <div class="message-content">
+                                <p>👋 Welcome to Star Wars GraphDB!</p>
+                                <p>Ask questions about the Star Wars universe. Try:</p>
+                                <ul>
+                                    <li>"Who is Luke Skywalker?"</li>
+                                    <li>"How many planets are there?"</li>
+                                    <li>"List all droids"</li>
+                                    <li>"What species is Yoda?"</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="chat-input-area">
+                        <div class="input-group">
+                            <input 
+                                type="text" 
+                                id="query-input" 
+                                class="query-input" 
+                                placeholder="Ask about Star Wars... (press Enter to submit)"
+                                onkeypress="if(event.key === 'Enter') submitQuery()"
+                            >
+                            <button onclick="submitQuery()" class="btn btn-primary">
+                                📤 Send
+                            </button>
+                        </div>
+                        <div class="loading-indicator" id="loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <span>Processing your question...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Explore Tab -->
+            <div id="explore-tab" class="tab">
+                <div class="explore-container">
+                    <!-- Search Section -->
+                    <div class="section">
+                        <h2>🔍 Search Entities</h2>
+                        <div class="search-group">
+                            <input 
+                                type="text" 
+                                id="search-input" 
+                                class="search-input" 
+                                placeholder="Search for characters, planets, etc..."
+                                onkeypress="if(event.key === 'Enter') performSearch()"
+                            >
+                            <button onclick="performSearch()" class="btn btn-primary">Search</button>
+                        </div>
+                        <div id="search-results" class="search-results"></div>
+                    </div>
+
+                    <!-- Statistics Section -->
+                    <div class="section">
+                        <h2>📊 Graph Statistics</h2>
+                        <button onclick="loadStats()" class="btn btn-secondary">Load Statistics</button>
+                        <div id="stats-container" class="stats-container"></div>
+                    </div>
+
+                    <!-- Schema Section -->
+                    <div class="section">
+                        <h2>📋 Data Schema</h2>
+                        <button onclick="loadSchema()" class="btn btn-secondary">Load Schema</button>
+                        <div id="schema-container" class="schema-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Tab -->
+            <div id="info-tab" class="tab">
+                <div class="info-container">
+                    <!-- System Info -->
+                    <div class="section">
+                        <h2>ℹ️ System Information</h2>
+                        <div id="system-info" class="info-grid"></div>
+                    </div>
+
+                    <!-- Capabilities -->
+                    <div class="section">
+                        <h2>✨ Capabilities</h2>
+                        <button onclick="loadCapabilities()" class="btn btn-secondary">Load Capabilities</button>
+                        <div id="capabilities-container" class="capabilities-container"></div>
+                    </div>
+
+                    <!-- Documentation -->
+                    <div class="section">
+                        <h2>📖 Quick Guide</h2>
+                        <div class="guide">
+                            <h3>How to Use</h3>
+                            <ol>
+                                <li>Ask questions in natural language</li>
+                                <li>The system converts your question to a SPARQL query</li>
+                                <li>Results are retrieved from the knowledge graph</li>
+                                <li>Results are displayed in an easy-to-read format</li>
+                            </ol>
+
+                            <h3>Example Queries</h3>
+                            <ul>
+                                <li><strong>Character Info:</strong> "Who is Luke Skywalker?"</li>
+                                <li><strong>Counting:</strong> "How many planets are there?"</li>
+                                <li><strong>Filtering:</strong> "List all droids"</li>
+                                <li><strong>Properties:</strong> "What species is Yoda?"</li>
+                                <li><strong>Relationships:</strong> "Who is Han Solo married to?"</li>
+                            </ul>
+
+                            <h3>Available Commands</h3>
+                            <ul>
+                                <li><strong>Search:</strong> Use the Explore tab to search for entities</li>
+                                <li><strong>Stats:</strong> View detailed graph statistics</li>
+                                <li><strong>Schema:</strong> See available data types and properties</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Star Wars GraphDB | RDF Knowledge Graph Query Engine | 2026</p>
+        </footer>
+    </div>
+
+    <!-- Query Detail Modal -->
+    <div id="query-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>SPARQL Query Details</h2>
+                <button onclick="closeQueryModal()" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="section">
+                    <h3>Query</h3>
+                    <pre><code id="sparql-code"></code></pre>
+                    <button onclick="copySPARQL()" class="btn btn-secondary">📋 Copy Query</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
