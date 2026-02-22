@@ -216,10 +216,14 @@ Be helpful and try to understand the user's intent even if the question is not p
         """Generate query using pattern matching (fallback)"""
         question_lower = question.lower()
         
-        # Pattern: Find character by name
-        if any(word in question_lower for word in ["who is", "find", "tell me about", "character", "who"]):
-            # Extract potential name
-            for name in ["luke", "leia", "han", "yoda", "vader", "c-3po", "r2-d2", "obi-wan"]:
+        # Pattern: Find character by name (who is X, find X, etc)
+        if any(word in question_lower for word in ["who is", "find", "tell me about", "character"]):
+            # Try to extract a name from the question
+            words = question_lower.split()
+            potential_names = ["luke", "leia", "han", "yoda", "vader", "c-3po", "r2-d2", "obi-wan", 
+                              "anakin", "padme", "palpatine", "dooku", "chewbacca", "bb-8", "rey", "kylo"]
+            
+            for name in potential_names:
                 if name in question_lower:
                     return f"""PREFIX voc: <https://swapi.co/vocabulary/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -230,18 +234,79 @@ SELECT ?entity ?label ?property ?value WHERE {{
     FILTER(CONTAINS(LCASE(str(?label)), LCASE("{name}")))
 }}
 LIMIT 50"""
-        
-        # Pattern: How many
-        if "how many" in question_lower or "count" in question_lower:
-            for entity_type in ["Character", "Planet", "Vehicle", "Droid", "Starship"]:
-                if entity_type.lower() in question_lower:
-                    return f"""PREFIX voc: <https://swapi.co/vocabulary/>
+            
+            # If "who is" but no specific name, search for any character mentioned after "who is"
+            if "who is" in question_lower:
+                parts = question_lower.split("who is")
+                if len(parts) > 1:
+                    name = parts[1].strip().split()[0].rstrip("?").strip()
+                    if name and len(name) > 2:
+                        return f"""PREFIX voc: <https://swapi.co/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT (COUNT(?entity) as ?count) WHERE {{
-    ?entity a voc:{entity_type} .
-}}"""
+SELECT ?entity ?label ?property ?value WHERE {{
+    ?entity rdfs:label ?label ;
+            ?property ?value .
+    FILTER(CONTAINS(LCASE(str(?label)), LCASE("{name}")))
+}}
+LIMIT 50"""
         
-        # Default: List all characters
+        # Pattern: How many / Count
+        if any(word in question_lower for word in ["how many", "count", "total", "how much"]):
+            if "planet" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+SELECT (COUNT(?entity) as ?count) WHERE {
+    ?entity a voc:Planet .
+}"""
+            elif "character" in question_lower or "person" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+SELECT (COUNT(?entity) as ?count) WHERE {
+    ?entity a voc:Character .
+}"""
+            elif "vehicle" in question_lower or "ship" in question_lower or "starship" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+SELECT (COUNT(?entity) as ?count) WHERE {
+    ?entity a voc:Vehicle .
+}"""
+            elif "droid" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+SELECT (COUNT(?entity) as ?count) WHERE {
+    ?entity a voc:Droid .
+}"""
+            # Default count
+            return """PREFIX voc: <https://swapi.co/vocabulary/>
+SELECT (COUNT(?entity) as ?count) WHERE {
+    ?entity a voc:Character .
+}"""
+        
+        # Pattern: List entities (list, show, all, etc)
+        if any(word in question_lower for word in ["list", "show", "all", "give me", "what are"]):
+            if "planet" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?label WHERE {
+    ?entity a voc:Planet ;
+            rdfs:label ?label .
+}
+LIMIT 50"""
+            elif "droid" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?label WHERE {
+    ?entity a voc:Droid ;
+            rdfs:label ?label .
+}
+LIMIT 50"""
+            elif "vehicle" in question_lower or "ship" in question_lower or "starship" in question_lower:
+                return """PREFIX voc: <https://swapi.co/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?label WHERE {
+    ?entity a voc:Vehicle ;
+            rdfs:label ?label .
+}
+LIMIT 50"""
+        
+        # Default: List all characters (for unknown queries)
         return """PREFIX voc: <https://swapi.co/vocabulary/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 

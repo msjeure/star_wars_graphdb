@@ -6,6 +6,7 @@ Provides REST API for the agent system
 import os
 import logging
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,11 +25,49 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+# Global database and agent (initialized on startup)
+db = None
+agent = None
+
+# ============================================================================
+# Lifespan Events (Modern FastAPI Pattern)
+# ============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    global db, agent
+    
+    # Startup
+    logger.info("Starting up Star Wars GraphDB API...")
+    current_dir = Path(__file__).parent
+    ttl_path = current_dir / "SWAPI-WD-data.ttl"
+    
+    if not ttl_path.exists():
+        logger.error(f"TTL file not found at {ttl_path}")
+        raise FileNotFoundError(f"TTL file not found: {ttl_path}")
+    
+    logger.info("Loading RDF graph...")
+    db = initialize_db(str(ttl_path))
+    
+    logger.info("Initializing agent...")
+    model = os.getenv("SWAPI_MODEL", "gpt-4")
+    agent = StarWarsGraphAgent(db, model=model)
+    
+    logger.info("✅ API ready!")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Star Wars GraphDB API...")
+
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="Star Wars GraphDB API",
     description="Natural Language Query Engine for Star Wars RDF Data",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware for frontend access
@@ -39,10 +78,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Global database and agent (initialized on startup)
-db = None
-agent = None
 
 # ============================================================================
 # Data Models
@@ -85,40 +120,6 @@ class CapabilitiesResponse(BaseModel):
 
 
 # ============================================================================
-# Startup and Shutdown
-# ============================================================================
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and agent on startup"""
-    global db, agent
-    
-    logger.info("Starting up Star Wars GraphDB API...")
-    
-    current_dir = Path(__file__).parent
-    ttl_path = current_dir / "SWAPI-WD-data.ttl"
-    
-    if not ttl_path.exists():
-        logger.error(f"TTL file not found at {ttl_path}")
-        raise FileNotFoundError(f"TTL file not found: {ttl_path}")
-    
-    logger.info("Loading RDF graph...")
-    db = initialize_db(str(ttl_path))
-    
-    logger.info("Initializing agent...")
-    model = os.getenv("SWAPI_MODEL", "gpt-4")
-    agent = StarWarsGraphAgent(db, model=model)
-    
-    logger.info("✅ API ready!")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Shutting down Star Wars GraphDB API...")
-
-
-# ============================================================================
 # Health Check
 # ============================================================================
 
@@ -154,6 +155,29 @@ async def query(request: QueryRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty")
     
     try:
+        # Check if this is a meta-question (about system capabilities)
+        question_lower = request.question.lower().rstrip("?!.,")
+        meta_keywords = ["what can you do", "who are you", "tell me about yourself", 
+                        "capabilities", "help", "what are you", "about", "info"]
+        
+        is_meta_question = any(keyword in question_lower for keyword in meta_keywords)
+        
+        if is_meta_question:
+            # Return capabilities instead of querying the database
+            stats = db.get_graph_stats()
+            return QueryResponse(
+                question=request.question,
+                sparql_query="-- Meta question: System capabilities",
+                results=[
+                    {"capability": "Answer questions about Star Wars entities"},
+                    {"capability": "Search for characters, planets, vehicles, droids"},
+                    {"capability": "Provide statistics and schema information"},
+                    {"capability": f"Access {stats.get('total_entities', 0)} entities in the database"},
+                    {"capability": f"Process {stats.get('total_triples', 0)} knowledge triples"},
+                ],
+                result_count=5
+            )
+        
         # Generate SPARQL and get results
         sparql_query, results = agent.query(request.question)
         
@@ -357,6 +381,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=8001,
         log_level="info"
     )
